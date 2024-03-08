@@ -27,10 +27,24 @@ local logger = _int.logger:sublogger("player")
 -- Minimal set of safe privs
 _aj.jailed_privs = { interact = true, shout = true, }
 
+-- A list of Luaentities safe to use player:set_detach()
+local save_detach_entities = {}
+if minetest.get_modpath("boats") then
+    save_detach_entities["boats:boat"] = true
+end
 local function set_player_pos(player, pos)
     -- TODO: do for more mods
 
     local name = player:get_player_name()
+
+    -- Check for save detachment
+    local attachment = player:get_attach()
+    if attachment then
+        local luaentity = attachment:get_luaentity()
+        if luaentity and save_detach_entities[luaentity.name] then
+            player:set_detach()
+        end
+    end
 
     -- Check for advtrains attachment
     if minetest.global_exists("advtrains") then
