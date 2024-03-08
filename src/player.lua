@@ -1,0 +1,155 @@
+-- areas_jail/src/player.lua
+-- Handle player mechanics
+--[[
+    areas_jail: Manage jails using area protection
+    Copyright (C) 2024  1F616EMO
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+]]
+
+local _aj = areas_jail
+local _int = _aj.internal
+local _data = _aj.jail_data
+local logger = _int.logger:sublogger("player")
+
+-- Minimal set of safe privs
+_aj.jailed_privs = { interact = true, shout = true, }
+
+local function set_player_pos(player, pos)
+    -- TODO: Deal with entitiy attachment
+    player:set_pos(pos)
+end
+
+function _aj.get_player_jail(player)
+    local meta = player:get_meta()
+
+    local jail = meta:get_string("areas_jail_in")
+    if jail == "" then return nil end
+    if not _data[jail] then
+        local name = player:get_player_name()
+        logger:action(("Player %s jailed in nonexist jail, moving them out."):format(name))
+        _aj.leave_jail(player)
+    end
+
+    return jail
+end
+
+function _aj.put_into_jail(player, id)
+    if not _data[id] then return false end
+
+    local name = player:get_player_name()
+    logger:action(("Putting player %s into jail %s."):format(
+        name, id
+    ))
+
+    local meta = player:get_meta()
+
+    local old_pos = player:get_pos()
+    meta:set_string("areas_jail_old_pos", minetest.pos_to_string(old_pos))
+
+    meta:set_string("areas_jail_in", id)
+
+    local spawnpoint = _data[id].spawnpoint
+    set_player_pos(player, spawnpoint)
+
+    local privs = minetest.get_player_privs(name)
+    local privs_s = minetest.serialize(privs)
+    meta:set_string("areas_jail_orig_privs", privs_s)
+
+    minetest.set_player_privs(name, _aj.jailed_privs)
+end
+
+function _aj.leave_jail(player) -- Does not handle teleportion
+    local name = player:get_player_name()
+    logger:action(("Taking player %s out of jail."):format(name))
+
+    local meta = player:get_meta()
+    meta:set_string("areas_jail_in", "")
+
+    local privs_s = meta:get_string("areas_jail_orig_privs")
+    if privs_s == "" then return end
+    local privs = minetest.deserialize(privs_s, true)
+    minetest.set_player_privs(name, privs)
+    meta:set_string("areas_jail_orig_privs", "")
+
+    meta:set_string("areas_jail_old_pos", "")
+end
+
+function _aj.find_restore_pos(player)
+    -- Step of checking
+    -- 1. Static Spawn
+    -- 2. /home position (requires sethome)
+    -- 3. The saved areas_jail_old_pos (may be not safe so we put this last)
+    -- 4. Leave them inside the jail (but they are theoretically free to leave)
+
+    local spawn_pos = minetest.setting_get_pos("static_spawnpoint")
+    if spawn_pos then return spawn_pos end
+
+    if minetest.global_exists("sethome") then
+        local name = player:get_player_name()
+        local home_pos = sethome.get(name)
+        if home_pos then return home_pos end
+    end
+
+    local old_pos_s =  meta:get_string("areas_jail_old_pos")
+    if old_pos_s ~= "" then
+        local old_pos = minetest.string_to_pos(old_pos_s)
+        if old_pos then return old_pos end
+    end
+
+    return nil
+end
+
+local passed = 0
+minetest.register_globalstep(function(dtime)
+    passed = passed + dtime
+    if passed < 0.4 then return end
+    passed = 0
+
+    for _, player in ipairs(minetest.get_connected_players()) do
+        local jail = _aj.get_player_jail(player)
+        if jail then
+            local pos = player:get_pos()
+            if not _aj.is_in_jail(pos, jail) then
+                local spawnpoint = _data[jail].spawnpoint
+
+                local name = player:get_player_name()
+                local spawnpoint_str = minetest.pos_to_string(spawnpoint)
+
+                logger:action(("Player %s found outside of jail %s, teleportig back to %s."):format(
+                    name, jail, spawnpoint_str
+                ))
+
+                set_player_pos(player, spawnpoint)
+            end
+        end
+    end
+end)
+
+minetest.register_on_respawnplayer(function(player)
+    local jail = _aj.get_player_jail(player)
+    if jail then
+        local spawnpoint = _data[jail].spawnpoint
+        local name = player:get_player_name()
+        local spawnpoint_str = minetest.pos_to_string(spawnpoint)
+        logger:action(("Player %s respawned while in jail %s, teleportig back to %s."):format(
+            name, jail, spawnpoint_str
+        ))
+
+        set_player_pos(player, spawnpoint)
+
+        return true
+    end
+end)

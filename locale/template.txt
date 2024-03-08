@@ -1,0 +1,26 @@
+# textdomain: areas_jail
+
+##[ src/chatcommands.lua ]##
+Put a player into a jail=
+<player> <jail ID>=
+Invalid usage, see /help @1=
+Player @1 is not online.=
+Jail @1 does not exist.=
+You have been jailed. Reflect on your mistakes, and ask moderators for more information.=
+Put @1 into jail @2.=
+Move a player out of jail=
+<player>=
+You have been moved out of jail. Do not make the same mistake again.=
+Failed to reset your position. Try using /home to go back.=
+Moved @1 out of jail.=
+Set or add the properties of a jail=
+<jail ID> <area IDs> <spawnpoint>=
+Area @1 does not exist.=
+The spawnpoint must be located inside the areas.=
+Jail set.=
+Unset a jail=
+<jail ID>=
+Jail unset.=
+List all jails=
+Jail list start=
+Jail list end=
