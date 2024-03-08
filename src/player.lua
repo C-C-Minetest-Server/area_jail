@@ -28,7 +28,26 @@ local logger = _int.logger:sublogger("player")
 _aj.jailed_privs = { interact = true, shout = true, }
 
 local function set_player_pos(player, pos)
-    -- TODO: Deal with entitiy attachment
+    -- TODO: do for more mods
+
+    local name = player:get_player_name()
+
+    -- Check for advtrains attachment
+    if minetest.global_exists("advtrains") then
+        local train_id = advtrains.player_to_train_mapping[name]
+        print(train_id)
+        if train_id and advtrains.trains[train_id] then
+            -- cf. advtrains/advtrains/trainlogic.lua in minetest.register_on_dieplayer
+            for _, wagon in pairs(minetest.luaentities) do
+                print(wagon.is_wagon, wagon.train_id)
+                if wagon.is_wagon and wagon.initialized then
+                    -- For some reason wagon.train_id == train_id does not work
+                    wagon:get_off_plr(name)
+                end
+            end
+        end
+    end
+
     player:set_pos(pos)
 end
 
@@ -103,7 +122,7 @@ function _aj.find_restore_pos(player)
         if home_pos then return home_pos end
     end
 
-    local old_pos_s =  meta:get_string("areas_jail_old_pos")
+    local old_pos_s = meta:get_string("areas_jail_old_pos")
     if old_pos_s ~= "" then
         local old_pos = minetest.string_to_pos(old_pos_s)
         if old_pos then return old_pos end
