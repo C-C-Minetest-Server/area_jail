@@ -48,6 +48,7 @@ local function set_player_pos(player, pos)
         end
     end
 
+    player_api.set_animation(player, "stand", 30)
     player:set_pos(pos)
 end
 
