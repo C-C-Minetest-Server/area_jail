@@ -131,9 +131,15 @@ function _aj.find_restore_pos(player)
     local spawn_pos = minetest.setting_get_pos("static_spawnpoint")
     if spawn_pos then return spawn_pos end
 
+    local name = player:get_player_name()
+
     if minetest.global_exists("sethome") then
-        local name = player:get_player_name()
         local home_pos = sethome.get(name)
+        if home_pos then return home_pos end
+    end
+
+    if minetest.global_exists("unified_inventory") then
+        local home_pos = unified_inventory.home_pos[name]
         if home_pos then return home_pos end
     end
 
